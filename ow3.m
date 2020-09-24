@@ -17,6 +17,8 @@ classdef ow3 < handle
         
         AXLEN = [];
         
+        smlh = []; %spacemouse listener handle
+        
 
         % Homogeneous transforms of the actual instance state
         
@@ -161,69 +163,74 @@ classdef ow3 < handle
             
         end %ow3
         
-        %{
-        
-        function ji = jin( obj, declination, azimuth )
-            % function ji = jin( obj, declination, azimuth )
-            %   Numerically calculates an approximation of the inverse 
-            %   analytical jacobian about the 
-            %   specified task space operating point.      
+        function jf = jfn( obj, q )
+            % function jf = jfn( obj, q )
+            %   Calculates the forward jacobian numerically using a finite
+            %   difference method.
             %
             %   INPUTS
-            %       declination,    scalar, [0, pi/2]
-            %       azimuth,        scalar, [-pi/2, pi/2]
+            %       q,      2 x n vectors of joint angles
             %
             %   OUTPUTS
-            %       ji,             2x6 inverse jacobian matrix
+            %       jf,     6 x 2 x n, forward jacobian matrix
+            %
+            %   EXAMPLE
             %
             %   NOTE
-            %       The inverse jacobian ji is a 2x6 matrix to map the 6x1
-            %       spatial twist to joint space velocity:
+            %       The forward jacobian matrix jf maps the joint
+            %       velocities qd to end effector platform velocities xd:
             %
-            %           qd = ji * xd
+            %           xd = jf(q) * qd
             %
-            %       
+            %       See for more information:
+            %       https://robotacademy.net.au/masterclass/...
+            %           velocity-kinematics-in-3d/?lesson=335
+            %
             
-            % This is done
-            % numerically by linear approximation about a given
-            % operation x.
-            %
-            %       qd = ji * xd
-            %
-            %   Given the individual inverse jacobian matrix elements
-            %   dqn / dx  
-            %
-            %   [   ji(1,1) ji(1,2) ji(1,3) ji(1,4) ji(1,5) ji(1,6);
-            %       ji(2,1) ji(2,2) ji(2,3) ji(2,4) ji(2,5) ji(2,6) ];
-            %
-            %   Rearrange into an A * x = b form by setting 
-            %
-            %       x = ji'
-            %
-            %   And each row of the regression matrix A is 
-            %
-            %       A = [dx dy dz drx dry drz]
-            % 
-            %   and each row of the b matrix is
-            %
-            %       b = [dq1 dq2]
-            %   
-            %
-            %  So we can numerically solve for x with
-            %
-            %    [dx dy dz drx dry drz] * x = [dq1 dq2]
-            %
-            %   Where x = ji'
-            %
-            %   Differential task space values are calculated by
-            %   calculating the homogeneous transform differences
-            % tdx = inv(tx0) * tx1
+            [nr,nc] = size( q );
             
-   
+            if nr ~= 2
+               error(  '2 x n matrix required for q' );
+            end
             
-        end % 
-        
-        %}
+            jf = zeros( 6, 2, nc );
+            txs = zeros( 4,4,2);
+            
+            dq = 1e-6;
+            
+            % for each set of q, calc forward jacobian numerically
+            for ii=1:nc
+                
+                % Get pose of interest
+                qnom = q(:,ii);
+                
+                % Iterate through each joint variable and add dq
+                for jj=1:length( qnom )
+                   
+                    qs = [qnom,qnom];
+                    qs(jj,1) = qs(jj,1) + dq;
+                    
+                    for kk=1:2
+                 
+                        [~,~,txs(:,:,kk)] = obj.fkine( qs(:,kk) );
+
+                    end %kk
+                    
+                    % todo: confirm if 1-2 or 2-1
+                    dtdq = (txs(:,:,1) - txs(:,:,2)) ./ dq;
+                    
+                    jf(1:3,jj,ii) = dtdq(1:3,4);
+                    
+                    R = txs(1:3,1:3,2);
+                    w = dtdq(1:3,1:3) * R';
+                    
+                    jf(4:6,jj,ii) = [w(3,2) w(1,3) w(2,1)]';
+                    
+                end %jj
+                
+            end %ii       
+                   
+        end % jfn
         
         function [declination, azimuth, base_tx_plat] = fkine( obj, q )
             % function [declination, azimuth, base_tx_plat] = fkine( obj, q )
@@ -234,7 +241,12 @@ classdef ow3 < handle
             %       q,  2 x 1 x n, column vector of joint values
             %
             %   OUTPUTS
-            
+            %       declination,    1 x n, [0, pi/2]
+            %       azimuth,        1 x n, [-pi/2, pi/2]
+            %       base_tx_plat,   4 x 4 x n, platform HGT w.r.t. base
+            %
+            %   EXAMPLE
+            %       >> [dec, az, tx] = fkine( [0,0]' );
             %
             %   NOTE
             %       Solution based on the paper:
@@ -333,52 +345,19 @@ classdef ow3 < handle
             
         end % fkine
         
-        %{
-        function jf = jfn( obj, declination, azimuth )
-            % function jf = jfn( obj, declination, azimuth )
-            %   Calculates the numerical forward jacobian at the given pose
-            %   using a numerical finite difference approach
-            
-            %   The forward jacobian maps the joint rates with respect to
-            %   time, qd, to the task space rates xd with respect to time:
-            %
-            %       xd = jfn * qd
-            %
-            %   In the case of the OmniwristIII mechanism, since there are
-            %   only two controlled joints q1 and q1, the shape of the
-            %   matrices are
-            %
-            %       xd  => 6 x 1
-            %       [   dx;
-            %           dy;
-            %           dz;
-            %           dwx;
-            %           dwy;
-            %           dwz; ];
-            %           
-            %
-            %       jfn => 6 x 2
-            %       [   dx/dq1  dx/dq2;
-            %           dy/dq1  dy/dq2;
-            %           dz/dq1  dz/dq2;
-            %           dwx/dq1 dwx/dq2;
-            %           dwy/dq1 dwy/dq2;
-            %           dwz/dq1 dwz/dq2; ];
-            %       
-            %       qd  => 2 x 1
-            %       [   dq1;
-            %           dq2; ];
-            %
-            
-            
-            
-            
-            
-        end % jfn
-        %}
         
-        
-        function [q, base_tx_plat, base_tx_cen, base_pt_apex] = ikine2( obj, declination, azimuth )
+        function [q, base_tx_plat, base_tx_cen, base_pt_apex] = ikine( obj, declination, azimuth )
+            % function [q, base_tx_plat, base_tx_cen, base_pt_apex] = ikine( obj, declination, azimuth )
+            %   Calculates the inverse kinematic solution of the ow3 mechanism.
+            %
+            %   INPUTS
+            %
+            %   OUTPUTS
+            %
+            %   EXAMPLE
+            %
+            %   NOTE            
+            %
             
             ld = length( declination );
             la = length( azimuth );
@@ -397,9 +376,6 @@ classdef ow3 < handle
             base_pt_apex = zeros(3,4,ld);
     
             base_tx_plat=zeros(4,4,ld);  
-            
-            % todo move these fixed transforms to object properties
-
             
             % Solve for each pair
             for ii=1:ld
@@ -611,12 +587,148 @@ classdef ow3 < handle
                 
             end % for
             
-        end % ikine2
-  
-        function drive( obj, declination, azimuth )
-            % function drive( obj, declination, azimuth )
-            % Updates the moving frames of the object instance
+        end % ikine
+        
+        
+        % private method
+        function driveListener( obj, src, varargin )
+            % function driveListener( obj, src, varargin )
+            %
+            %
             
+            pause( 0.01 );
+            
+            % Rotation scaling determined emperically 
+            rs = 2.75;
+            
+            % No translation needed
+            ts = 0;
+            
+            [dec, az] = obj.ow_spacemouse_input( src, rs, ts );
+            
+            obj.drive( dec, az );
+            
+        end % driveListener
+        
+        function [dec, az] = ow_spacemouse_input( obj, hDrv, rscale, tscale )
+            % function [dec, az] = ow_spacemouse_input( hDrv, rscale, tscale )
+            %
+            %
+
+            % Align with physical mouse on desk
+            trx = eye(4,4);
+            trx(1:3,1:3) = rotx(pi/2); % align orientation with mouse on desk
+
+            zax = [0 0 1]';
+
+            % Y axis is vertical; calc angle from nominal
+            tx = trx * obj.spacemouse_tx( hDrv, rscale, tscale );
+
+            % Calc angle from vertical
+            ang = acos( dot( zax, tx(1:3,2) ) / ( norm(zax)*norm(tx(1:3,2)) ) );
+
+            % Limit value based on Z component of Y axis
+            if tx(3,2) < 0
+                dec = pi/2;
+            else
+                dec = abs( ang );
+            end
+
+            % Calulate azimuth angle from X axis
+            az = atan2( tx(2,2), tx(1,2) );
+
+        end % ow_spacemouse_input
+        
+        function tx = spacemouse_tx( ~, hDrv, rscale, tscale )
+            % function tx = spacemouse_tx( ~, hDrv, rscale, tscale )
+            %   Receives the handle for a previously instantiated spacemouse object,
+            %   queries the sensor values, and returns a 4x4 homogeneous transform
+            %   matrix scaled by rscale and tscale.
+            %
+            %   INPUTS
+            %       hDrv,   handle to 3d spacemouse driver object
+            %       rscale, angular scaling value
+            %       tscale, translational scaling value
+            %
+            %   OUTPUTS
+            %       tx,     4x4 homogeneous transform scaled to mouse pose
+            %
+            %   EXAMPLE
+            %       >> import mouse3D.*
+            %       >> hDrv = mouse3Ddrv; % need to assign handle to new variable
+            %       >> tx = spacemouse_tx( hDrv );
+            %
+            %   NOTE
+            %
+            %       The nominal orientation of the spacemouse coordinate frame is right
+            %       up, back corresponding to X, Y, Z respectively.
+            %
+            %       See 
+            %   https://www.mathworks.com/matlabcentral/fileexchange/...
+            %       22124-3d-mouse-support-using-classes-and-events
+            %
+            %       Also requires the Robotics Toolbox (P Corke)
+            %
+
+            % Max value used to scale axes to +/- 1; determined emperically
+            T_MAX = 3000;
+
+            x = hDrv.Sen.Translation.X / T_MAX;
+            y = hDrv.Sen.Translation.Y / T_MAX;
+            z = hDrv.Sen.Translation.Z / T_MAX;
+
+            ang = hDrv.Sen.Rotation.Angle / T_MAX; % in degrees
+            rx = hDrv.Sen.Rotation.X;
+            ry = hDrv.Sen.Rotation.Y;
+            rz = hDrv.Sen.Rotation.Z;
+
+            tx = angvec2tr( ang*rscale, [rx, ry, rz] );
+            t = [x y z]';
+            tx(1:3,4) = t.*tscale;
+
+
+        end % spacemouse_tx
+        
+        
+        % todo: change this to driving joints
+        function drive( obj, varargin )
+            % function drive( obj, varargin )
+            %
+            %
+            
+            switch length( varargin )
+                
+                case 0
+                    % No args passed, try to delete listener
+                    try
+                       delete( obj.smlh ); 
+                    catch ME
+                        disp(ME);
+                    end
+                    
+                    return
+                    
+                case 1
+                    % Single arg passed; assume handle to 3d mouse passed;
+                    % set up listner callback
+                    if ~isa( varargin{1}, 'mouse3D.mouse3Ddrv')
+                        error('Single argument must be 3D mouse driver object')
+                    end
+
+                    % else assign listener
+                    obj.smlh =  addlistener( varargin{1}, 'SenState', @obj.driveListener );
+
+                    return
+                    
+                case 2
+                    % Two args passed; assume declination / azimuth
+                    declination = varargin{1};
+                    azimuth = varargin{2};
+                
+                otherwise
+                    error( 'Up to two arguments only.');
+                    
+            end % switch
             
             ld = length( declination );
             la = length( azimuth );
@@ -629,6 +741,8 @@ classdef ow3 < handle
                 dec = declination( ii );
                 az = azimuth( ii );
                 
+                
+                
 %                 assert( ( obj.declination_min <= dec) && ( dec <= obj.declination_max ) );
 %                 assert( ( obj.azimuth_min <= az ) && (az <= obj.azimuth_max) );
                 
@@ -637,8 +751,7 @@ classdef ow3 < handle
         
             
                 % values
-                %[q, base_tx_plat, base_tx_cen, apex] = ikine2( obj, declination, azimuth )
-                [q, obj.base_hgt_plat, obj.base_hgt_cen, base_pt_apex] = obj.ikine2( declination, azimuth );
+                [q, obj.base_hgt_plat, obj.base_hgt_cen, base_pt_apex] = obj.ikine( declination, azimuth );
                 
                 obj.base_ptx_ptA(1:3,4) = base_pt_apex(:,1);
                 obj.base_ptx_ptB(1:3,4) = base_pt_apex(:,2);
@@ -723,22 +836,22 @@ classdef ow3 < handle
                     end
                     
                 catch ME
-                    disp(ME);
-                    keyboard
+                    %disp(ME);
+                    %keyboard
                 end
                                
             end % for
             
         end % drive
         
+        
         function plot3d( obj, varargin )
-            
-            % FUNCTION axhan = plot3d( obj, varargin )
+            %
             %   Plots a 3d model of the mechansim instance
             %   
             
-            soln = [];
             ts = [];
+            zoom  = 1;
             
             for argn=1:2:nargin-1 %remove the counted obj arg
                 
@@ -750,11 +863,8 @@ classdef ow3 < handle
                     case 'axhan'
                         obj.axhan = varargin{argn+1};
                         
-                    case 'soln'
-                        soln = varargin{argn+1};
-                        
-                    case 'ts'
-                        ts = varargin{argn+1};
+                    case 'zoom'
+                        zoom = varargin{argn+1};                        
                         
                     otherwise
                         
@@ -764,9 +874,9 @@ classdef ow3 < handle
                 
             end % for
             
-            %debug
+            % debug
             obj.fighan = [];
-            obj.axhan = [];
+            obj.axhan=  [];
             
             
             
@@ -774,7 +884,8 @@ classdef ow3 < handle
                 % Instance figure handle empty; raise a new figure
                 obj.fighan = figure( 'name', obj.name,...
                     'numbertitle', 'off', ...
-                    'menubar', 'none' );
+                    'menubar', 'none', ...
+                    'CloseRequestFcn', @obj.plot3dCloseRequestFcn );
             end
             
             
@@ -800,6 +911,7 @@ classdef ow3 < handle
                 xlim( [-obj.radius,obj.radius].*2 );
                 ylim( [-obj.radius,obj.radius].*2);
                 zlim( [-obj.radius,obj.radius*2] );
+                camzoom( zoom );
             
                 % Since axis was empty, child transforms and child plots
                 % have to be drawn
@@ -1120,10 +1232,22 @@ classdef ow3 < handle
                 
             end
 
-            
           
             
         end % plot3d
+        
+        % static internal method
+        function plot3dCloseRequestFcn( obj, src, ~ )
+            
+            % Try to delete spacemouse listener
+            try
+                delete( obj.smlh ); 
+            catch ME
+                disp(ME);
+            end
+
+            delete( src );
+        end
         
         
     end %methods

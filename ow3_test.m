@@ -1,36 +1,55 @@
 % File:  ow3_test.m
 
+clc();
 close all;
 clearvars();
 
+% Create ow ow instance
+ ow = ow3( 'radius', 100, 'edge',100, 'alpha', pi/4, 'ang_len', 10);
+ 
+ tyler = 0.75;
+ 
+ ow.plot3d('zoom', tyler);
+ 
+rs = 2.75;
+ts = 0;
+ 
+ 
+ % Import 3d mouse class
+ import mouse3D.*
+ 
+ % Create a copy of the instance; this is needed otherwise weird stuffs
+ hDrv = mouse3Ddrv;
+ 
+ ow.drive( hDrv )
+ 
+ 
+ %  while 1
+%      
+%      pause(0.01);
+%      
+%      [dec, az] = ow_spacemouse_input( hDrv, rs, ts );
+%      
+%      ow.drive( dec, az );
+%      
+%  end
+%  
 
-% Mechanism parameters
-linkLength = 45;
-linkRadius = 40;
-angleLinkLength = 20;
-angleLinkAngle = pi/4;
+ 
+ 
+ 
+ 
+ 
+%  % Capture histograms 
+%  tout = 5; % capture time, s
+%  
+%  tstart = tic();
+%  tdelta = toc( tstart );
+%  while tdelta < tout
+%     
+%      tdelta = toc( tstart )
+%      
+%      
+%      
+%  end
 
-% Define path to STL files
-STLBaseDir = 'D:\Managed\MagicLeap\emtracking\omniwrist-z\';
-baseTx1STLFilePath 		= [STLBaseDir, 'BLOCK_END_EFFECTOR_TX1.STL'];
-baseLinkTx2STLFilePath 	= [STLBaseDir, 'BRACKET_CIRCLE_ASSY_TX2.STL'];
-angleLinkTx3STLFilePath = [STLBaseDir, 'BRACKET_ANGLE_ASSY_TX3.STL'];
-platLinkTx4STLFilePath 	= [STLBaseDir, 'BRACKET_CIRCLE_ASSY_TX4.STL'];
-platformTx5STLFilePath 	= [STLBaseDir, 'BLOCK_END_EFFECTOR_TX5.STL'];
-
-ow3 = OmniWrist3( linkLength, ...
-	linkRadius, ...
-	angleLinkLength, ...
-	angleLinkAngle, ...
-	'baseTx1STLFilePath', baseTx1STLFilePath, ...
-	'baseLinkTx2STLFilePath', baseLinkTx2STLFilePath,...
-	'angleLinkTx3STLFilePath', angleLinkTx3STLFilePath,...
-	'platLinkTx4STLFilePath', platLinkTx4STLFilePath, ...
-	'platformTx5STLFilePath', platformTx5STLFilePath...
-    );
-
-
-qnom = [    pi/8,pi/2,-pi/2,-pi/8;
-            pi/8,pi/2,-pi/2,-pi/8;
-            pi/8,pi/2,-pi/2,-pi/8;
-            pi/8,pi/2,-pi/2,-pi/8; ]';
