@@ -16,7 +16,7 @@ function plotDebug3d( items, ax_scale, lims )
                     'position', [0 0 1 1] );
     axhan.Toolbar.Visible = 'on';
     set( axhan, 'nextplot', 'replacechildren' );
-    axis vis3d equal 
+    
     grid on
     xlabel('X');
     ylabel('Y');
@@ -24,6 +24,7 @@ function plotDebug3d( items, ax_scale, lims )
     xlim( lims( 1,: ) );
     ylim( lims( 2, : ) );
     zlim( lims( 3, : ) );
+    axis vis3d equal 
     
 
 
@@ -31,7 +32,18 @@ function plotDebug3d( items, ax_scale, lims )
 
         hgt = hgtransform( 'parent', axhan );
         
-        item = items{ii};
+        if isa( items, 'cell' )
+            item = items{ii};
+        else
+            try
+                item = items(:,:,ii);
+            catch
+                item=[];
+            end
+        end
+            
+        
+%         item = items{ii};
 
         [nr,nc] = size( item );
 

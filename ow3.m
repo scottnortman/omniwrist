@@ -829,6 +829,7 @@ classdef ow3 < handle
 
                             hgt_tag = pl{jj};
                             mtx = eval( ['obj.', hgt_tag] );
+                            % todo; if mtx is 4x4xN need to iterate through
                             set( findobj( obj.axhan, 'tag', hgt_tag ), 'Matrix', mtx ) ;
 
                         end                      
