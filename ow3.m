@@ -165,14 +165,14 @@ classdef ow3 < handle
         
         function jf = jfn( obj, q )
             % function jf = jfn( obj, q )
-            %   Calculates the forward jacobian numerically using a finite
-            %   difference method.
+            %   Calculates the forward geometric jacobian numerically using
+            %   a finite difference method.
             %
             %   INPUTS
             %       q,      2 x n vectors of joint angles
             %
             %   OUTPUTS
-            %       jf,     6 x 2 x n, forward jacobian matrix
+            %       jf,     6 x 2 x n, forward geometric jacobian matrix
             %
             %   EXAMPLE
             %
@@ -180,7 +180,9 @@ classdef ow3 < handle
             %       The forward jacobian matrix jf maps the joint
             %       velocities qd to end effector platform velocities xd:
             %
-            %           xd = jf(q) * qd
+            %           w = jf(q) * qd
+            %
+            %       otherwise known as the spatial velocity or twist
             %
             %       See for more information:
             %       https://robotacademy.net.au/masterclass/...
@@ -224,6 +226,7 @@ classdef ow3 < handle
                     R = txs(1:3,1:3,2);
                     w = dtdq(1:3,1:3) * R';
                     
+                    % Given the skew symmetric matrix, get omega
                     jf(4:6,jj,ii) = [w(3,2) w(1,3) w(2,1)]';
                     
                 end %jj
@@ -351,6 +354,8 @@ classdef ow3 < handle
             %   Calculates the inverse kinematic solution of the ow3 mechanism.
             %
             %   INPUTS
+            %       declination,    radians, 1 x n vector
+            %       azimuth,        radians, 1 x n vector
             %
             %   OUTPUTS
             %
@@ -593,6 +598,12 @@ classdef ow3 < handle
         % private method
         function driveListener( obj, src, varargin )
             % function driveListener( obj, src, varargin )
+            %   Callback function that is automatically called by the 3d
+            %   spacemouse driver upon a change in control input values.
+            %   This in turn calls the ow_spacemouse_input function with
+            %   suitable rotation and translation scaling and then calls
+            %   the ow.drive function to update the pose of the 3d plotted
+            %   model.
             %
             %
             
@@ -607,6 +618,13 @@ classdef ow3 < handle
             [dec, az] = obj.ow_spacemouse_input( src, rs, ts );
             
             obj.drive( dec, az );
+            
+            % Print the jacobian (debug)
+            clc();
+            q = obj.ikine( dec, az );
+            jfn = obj.jfn( q(1:2) )
+            jin = pinv(jfn)
+            
             
         end % driveListener
         

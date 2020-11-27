@@ -5,7 +5,10 @@ close all;
 clearvars();
 
 % Create ow ow instance
- ow = ow3( 'radius', 100, 'edge',100, 'alpha', pi/4, 'ang_len', 10);
+%  ow = ow3( 'radius', 50, 'edge',40, 'alpha', pi/4, 'ang_len', 10);
+ 
+  ow = ow3( 'radius', 40, 'edge',25, 'alpha', pi/2, 'ang_len',0);
+%   ow = ow3( 'radius', 40, 'edge',25, 'alpha', pi/3, 'ang_len',0);
  
  tyler = 0.75;
  
